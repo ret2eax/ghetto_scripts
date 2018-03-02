@@ -1,9 +1,11 @@
-# offensive scripts
+# offensive tools
 
-This repository contains scripts that have been found useful when executing offensive security engagements.
+This repository contains tools & scripts that have been found useful when executing offensive security engagements.
 
 * Passive Reconaissance // Open-source Intelligence (OSINT) // Information Gathering
 * Active Target Enumeration
-* Exploitation
+* Web & API Exploitation
+* Infrastructure Exploitation
+* Thick Client Exploitation
 * Post Exploitation
 * ...
