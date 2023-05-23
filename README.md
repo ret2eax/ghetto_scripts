@@ -1,2 +1,2 @@
 # ghetto scripts
-Ghetto scripts for various things.
+Ghetto scripts for various things. 
