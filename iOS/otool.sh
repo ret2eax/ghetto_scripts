@@ -1,4 +1,9 @@
 # Basic SH script to search insecurities associated with iOS IPA binary build
+# Install Darwin CC Tools on JB device
+# Save the script as otool.sh
+# chmod +x otool.sh
+#./otool.sh
+
 #!/bin/sh
 #
 # Color codes for formatting
