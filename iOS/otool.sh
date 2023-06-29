@@ -1,4 +1,4 @@
-# Basic SH script to search insecurities associated with iOS IPA binary build
+# Basic Static Analysis SH script to search insecurities associated with iOS IPA binary build.
 
 # USAGE
 # 1. Install Darwin CC Tools on JB device
@@ -14,7 +14,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
-
+#BEGIN
 echo " "
 echo -e "${BLUE}[ oTool Enumeration Script for iOS IPA Binary Analysis (Minimal Checks) ]${RED}"
 echo "Requires oTool: DL from CC Darwin Tools in Cydia"
@@ -25,42 +25,48 @@ read -r binaryPath
 echo " "
 echo "Binary path set to: $binaryPath"
 echo " "
-echo -e "${GREEN}SEARCHING FOR INSECURE RNGs...${RED}"
+echo -e "${BLUE}[ INSECURE RNGs ]${RED}"
 echo " "
 otool -Iv "$binaryPath" | grep -w _random
 otool -Iv "$binaryPath" | grep -w _srand
 otool -Iv "$binaryPath" | grep -w _rand
+echo ""
+echo -e "${BLUE}_________________________________________${NC}"
+echo " "
+echo -e "${BLUE}[ INSECURE 'MALLOC' FUNCTION ]${RED}"
+echo " "
+otool -Iv "$binaryPath"  | grep -w "_malloc"
 echo " "
 echo -e "${BLUE}_________________________________________${NC}"
 echo " "
-echo -e "${GREEN}SEARCHING FOR WEAK HASHING ALGORITHMS...${RED}"
+echo -e "${BLUE}[ WEAK HASHING ALGORITHMS ]${RED}"
 echo " "
-# HASHING:
 otool -Iv "$binaryPath" | grep -w _CC_MD5
 otool -Iv "$binaryPath" | grep -w _CC_SHA1
-echo " "
+echo ""
 echo -e "${BLUE}_________________________________________${NC}"
 echo " "
-echo -e "${GREEN}SEARCHING FOR INSECURE & DEPRECATED API FUNCTIONS...${RED}"
+echo -e "${BLUE}USE OF INSECURE & DEPRECATED APIs ]${RED}"
 echo ""
-# Deprecated Functions:
-deprecated_functions=("memcpy" "strncpy" "strcpy" "strlen" "strcat" "strncat" "sprintf" "vsprintf" "gets")
+deprecated_functions=("memcpy" "strncpy" "strcpy" "strlen" "strcat" "strncat" "sprintf" "vsprintf" "vsnprintf" "gets" "sscanf" "strtok" "alloca" "printf")
 for func in "${deprecated_functions[@]}"; do
     otool -Iv "$binaryPath" | grep -w "_$func"
 done
 echo " "
 echo -e "${BLUE}_________________________________________${NC}"
 echo " "
-echo -e "${GREEN}SEARCHING FOR BINARY PROTECTION...${RED}"
+echo -e "${BLUE}[ BINARY PROTECTION MECHANISMS ]${GREEN}"
 echo " "
-echo -e "${BLUE}ASLR:${RED}"
+echo -e "${BLUE}PIE (Position Independent Executable): Should include the PIE Flag:${GREEN}"
 otool -Vh "$binaryPath" | grep PIE
 echo ""
-echo -e "${BLUE}ARC:${RED}"
+echo -e "${BLUE}ARC (Automatic Reference Counting): Should include the _objc_release symbol:${GREEN}"
 otool -Iv "$binaryPath" | grep -w _objc_release
 echo ""
-echo -e "${BLUE}Stack smashing:${RED}"
+echo -e "${BLUE}Encrypted Binary: The binary should be encrypted (only for iOS App Store IPAs): The cryptid should be '1'${GREEN}"
+otool -arch all -Vl "$binaryPath" | grep -A5 LC_ENCRYPT
+echo " "
+echo -e "${BLUE}Stack smashing:${GREEN}"
 otool -Iv "$binaryPath" | grep -w ___stack_chk_guard
-echo " "
-echo -e "${GREEN}Done.${NC}"
-echo " "
+echo -e "${NC} ${NC}"
+#EOF
