@@ -1,2 +1,2 @@
 # ghetto scripts
-Ghetto scripts for various things. 
+Ghetto scripts to automate various enumeration techniques, analysis and other things. 
