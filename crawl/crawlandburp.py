@@ -6,10 +6,13 @@
 # Could have been written much better, yet it is in "ghetto_scripts" for a reason..
 
 
-import requests
 import time
 import os
+import asyncio
+import aiohttp
+import requests
 from urllib.parse import urlparse
+import os
 from progress.bar import Bar
 
 # ANSI color codes for colored output
@@ -64,29 +67,45 @@ def get_base_domain(url):
     parts = urlparse(url).netloc.split('.')
     return '.'.join(parts[-2:]) if len(parts) > 2 else url
 
-def check_for_redirects(url):
-    try:
-        response = requests.get(url, allow_redirects=False)
-        if response.status_code in [301, 302, 307, 308]:
-            location = response.headers.get('Location', '')
-            if location.startswith('https://'):
-                return location
-            elif location:
-                return urlparse(url)._replace(scheme='https', path=location).geturl()
-    except requests.RequestException as e:
-        print(f"Error checking for redirects for {url}: {e}")
+async def check_for_redirects(session, url, timeout=5, max_retries=3):
+    retries = 0
+    while retries < max_retries:
+        try:
+            async with session.get(url, allow_redirects=False, timeout=timeout) as response:
+                if response.status in [301, 302, 307, 308]:
+                    location = response.headers.get('Location', '')
+                    if location.startswith('https://'):
+                        return location
+                    elif location:
+                        return urlparse(url)._replace(scheme='https', path=location).geturl()
+                return url
+        except Exception as e:
+            retries += 1
+            print(f"Retry {retries}/{max_retries} for {url}: {e}")
     return url
 
-def prepare_urls_for_scanning(file_path):
-    prepared_urls = []
+async def prepare_urls_for_scanning(file_path):
+    urls = read_domains_from_file(file_path)
+    cache = {}  # Simple URL cache
+    processed_urls = []
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for url in urls:
+            if url not in cache:
+                task = asyncio.ensure_future(check_for_redirects(session, url))
+                tasks.append(task)
+            else:
+                processed_urls.append(cache[url])
+        for i, task in enumerate(asyncio.as_completed(tasks), 1):
+            result = await task
+            cache[urls[i-1]] = result
+            processed_urls.append(result)
+            print(f"{Colors.OKGREEN}Processed {i}/{len(urls)} URLs.{Colors.ENDC}")
+    return processed_urls
+
+def read_domains_from_file(file_path):
     with open(file_path, 'r') as file:
-        for line in file:
-            domain = line.strip()
-            if not domain.startswith(('http://', 'https://')):
-                domain = 'http://' + domain
-            final_url = check_for_redirects(domain)
-            prepared_urls.append(final_url)
-    return prepared_urls
+        return [f"http://{line.strip()}" for line in file if line.strip()]
 
 def start_burp_scan(urls, burp_api_url, burp_api_key, scan_configuration_ids=[]):
     headers = {
@@ -106,6 +125,7 @@ def start_burp_scan(urls, burp_api_url, burp_api_key, scan_configuration_ids=[])
         else:
             return None
     else:
+        print(f"Failed to start scan task: {response.status_code} - {response.text}")
         return None
 
 def get_scan_progress(burp_api_url, burp_api_key, task_id):
@@ -116,10 +136,11 @@ def get_scan_progress(burp_api_url, burp_api_key, task_id):
     if response.status_code == 200:
         return response.json()
     else:
+        print(f"Failed to get scan progress: {response.status_code} - {response.text}")
         return None
 
 def monitor_scan_progress(scan_task_id, burp_api_url, burp_api_key):
-    print(f"Monitoring scan task ID: {scan_task_id}")
+    print(f"{Colors.BOLD}Monitoring scan task ID: {scan_task_id}{Colors.ENDC}")
     bar = Bar('Progress', max=100)
 
     while True:
@@ -133,18 +154,21 @@ def monitor_scan_progress(scan_task_id, burp_api_url, burp_api_key):
                 break
         time.sleep(5)
 
-def read_domains_from_file(file_path):
-    with open(file_path, 'r') as file:
-        return [line.strip() for line in file if line.strip()]
+# Main execution
+async def main():
+    file_path = 'domains.txt'
+    burp_api_url = 'http://localhost:1337'
+    burp_api_key = 'your_api_key_here'
+    scan_configuration_ids = ['OptimisedCrawl', 'OptimisedAudit']
 
-# Script setup and execution
-file_path = 'domains.txt'
-burp_api_url = 'http://localhost:1337'
-burp_api_key = 'your_api_key_here'
-scan_configuration_ids = ['OptimisedCrawl', 'OptimisedAudit']
+    prepared_urls = await prepare_urls_for_scanning(file_path)
+    print(f"{Colors.BOLD}Total URLs processed: {len(prepared_urls)}{Colors.ENDC}")
 
-urls_for_scanning = prepare_urls_for_scanning(file_path)
-scan_task_id = start_burp_scan(urls_for_scanning, burp_api_url, burp_api_key, scan_configuration_ids)
+    scan_task_id = start_burp_scan(prepared_urls, burp_api_url, burp_api_key, scan_configuration_ids)
+    if scan_task_id:
+        monitor_scan_progress(scan_task_id, burp_api_url, burp_api_key)
 
-if scan_task_id:
-    monitor_scan_progress(scan_task_id, burp_api_url, burp_api_key)
+# Run the async main function
+if __name__ == "__main__":
+    asyncio.run(main())
+
