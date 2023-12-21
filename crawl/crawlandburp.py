@@ -52,7 +52,7 @@ def display_progress_info(info, bar):
     if issues:
         print(Colors.BOLD + "Issues Found:" + Colors.ENDC)
         display_issues(issues)
-
+        
 def read_domains_from_file_and_prepare_variants(file_path):
     domains = []
     with open(file_path, 'r') as file:
@@ -60,17 +60,17 @@ def read_domains_from_file_and_prepare_variants(file_path):
         for row in reader:
             domain = row[0].strip()
 
-            # Only add the 'http://' prefix if no protocol is specified
-            # Burp config handles remainder via /^(http|https)://(www\.)?.+$/ regex
+            # Add both 'http://' and 'https://' prefixes
+            # Burp config handles the TLD prepending www when needed via /^(www\.)?.+$/ regex
             # Done so by Project/User config files.
             if not domain.startswith('http://') and not domain.startswith('https://'):
                 http_version = 'http://' + domain
-                domains.append(http_version)
+                https_version = 'https://' + domain
+                domains.extend([http_version, https_version])
             else:
                 domains.append(domain)
 
     return domains
-
 
 def start_burp_scan(urls, burp_api_url, scan_configuration_ids=[]):
     headers = {'Content-Type': 'application/json'}
