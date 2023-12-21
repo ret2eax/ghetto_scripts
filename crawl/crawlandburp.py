@@ -50,7 +50,7 @@ def display_progress_info(info, bar):
     print(f"  Estimated Time Remaining: {metrics.get('crawl_and_audit_caption', 'N/A')}")
     issues = info.get('issue_events', [])
     if issues:
-        print(Colors.BOLD + "Issues Found:" + Colors.ENDC)
+        print(Colors.BOLD + "\nPotential Reportable Bugs Identified (HIGH|MED|LOW == Certain|Firm):\n" + Colors.ENDC)
         display_issues(issues)
         
 def read_domains_from_file_and_prepare_variants(file_path):
