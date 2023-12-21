@@ -2,7 +2,6 @@
 # This script is currently developed to not use burp's REST API key.
 # Could have been written much better, yet it is in "ghetto_scripts" for a reason..
 
-#!/usr/bin/python3
 import asyncio
 import requests
 import os
