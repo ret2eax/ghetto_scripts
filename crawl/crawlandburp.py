@@ -61,19 +61,17 @@ def read_domains_from_file_and_prepare_variants(file_path):
         for row in reader:
             domain = row[0].strip()
 
-            # Prepare variants
-            variants = [domain]
+            # Only add the 'http://' prefix if no protocol is specified
+            # Burp config handles remainder via /^(http|https)://(www\.)?.+$/ regex
+            # Done so by Project/User config files.
             if not domain.startswith('http://') and not domain.startswith('https://'):
-                variants = [
-                    'http://' + domain,
-                    'https://' + domain,
-                    'https://www.' + domain
-                ]
-            elif domain.startswith('https://'):
-                variants.append(domain.replace('https://', 'https://www.'))
+                http_version = 'http://' + domain
+                domains.append(http_version)
+            else:
+                domains.append(domain)
 
-            domains.extend(variants)
     return domains
+
 
 def start_burp_scan(urls, burp_api_url, scan_configuration_ids=[]):
     headers = {'Content-Type': 'application/json'}
