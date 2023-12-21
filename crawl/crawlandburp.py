@@ -1,16 +1,12 @@
 #/usr/bin/python3
-# This script is currently developed to not use burp's api keys.
-# However this can be added, as most support for API keys is integrated
-# It is important however, that ApiKey is placed in GET request as per
-# Burp's REST API documentation and so this script needs minor tweaking to do so.
+# This script is currently developed to not use burp's REST API key.
 # Could have been written much better, yet it is in "ghetto_scripts" for a reason..
 
 import asyncio
 import requests
-import time
 import os
+import csv
 from progress.bar import Bar
-from urllib.parse import urlparse
 
 # ANSI color codes for colored output
 class Colors:
@@ -57,15 +53,22 @@ def display_progress_info(info, bar):
         print(Colors.BOLD + "Issues Found:" + Colors.ENDC)
         display_issues(issues)
 
-def read_domains_from_file(file_path):
+def read_domains_from_file_and_prepare_variants(file_path):
+    domains = []
     with open(file_path, 'r') as file:
-        return [line.strip() for line in file if line.strip()]
+        reader = csv.reader(file)
+        for row in reader:
+            domain = row[0].strip()
+            if not domain.startswith('http://') and not domain.startswith('https://'):
+                http_version = 'http://' + domain
+                https_version = 'https://' + domain
+                domains.extend([http_version, https_version])
+            else:
+                domains.append(domain)
+    return domains
 
-def start_burp_scan(urls, burp_api_url, burp_api_key, scan_configuration_ids=[]):
-    headers = {
-        'Content-Type': 'application/json',
-        'X-Portswigger-API-Key': burp_api_key
-    }
+def start_burp_scan(urls, burp_api_url, scan_configuration_ids=[]):
+    headers = {'Content-Type': 'application/json'}
     data = {
         "urls": urls,
         "scan_configurations": [{"type": "NamedConfiguration", "name": config_id} for config_id in scan_configuration_ids]
@@ -82,22 +85,19 @@ def start_burp_scan(urls, burp_api_url, burp_api_key, scan_configuration_ids=[])
         print(f"Failed to start scan task: {response.status_code} - {response.text}")
         return None
 
-def get_scan_progress(burp_api_url, burp_api_key, task_id):
-    headers = {
-        'X-Portswigger-API-Key': burp_api_key
-    }
-    response = requests.get(burp_api_url + f"/v0.1/scan/{task_id}", headers=headers)
+def get_scan_progress(burp_api_url, task_id):
+    response = requests.get(burp_api_url + f"/v0.1/scan/{task_id}")
     if response.status_code == 200:
         return response.json()
     else:
         print(f"Failed to get scan progress: {response.status_code} - {response.text}")
         return None
 
-def monitor_scan_progress(scan_task_id, burp_api_url, burp_api_key):
+async def monitor_scan_progress(scan_task_id, burp_api_url):
     print(f"{Colors.BOLD}Monitoring scan task ID: {scan_task_id}{Colors.ENDC}")
     bar = Bar('Progress', max=100)
     while True:
-        progress_info = get_scan_progress(burp_api_url, burp_api_key, scan_task_id)
+        progress_info = get_scan_progress(burp_api_url, scan_task_id)
         if progress_info:
             display_progress_info(progress_info, bar)
             scan_status = progress_info.get('scan_status')
@@ -105,21 +105,31 @@ def monitor_scan_progress(scan_task_id, burp_api_url, burp_api_key):
                 bar.finish()
                 print(f"Scan {scan_status}.")
                 break
-        time.sleep(5)
+        await asyncio.sleep(5)
 
-# Main execution
+def segment_into_batches(urls, batch_size):
+    for i in range(0, len(urls), batch_size):
+        yield urls[i:i + batch_size]
+
+async def process_batch(batch, burp_api_url, scan_configuration_ids):
+    print(f"{Colors.BOLD}Starting scan for batch with {len(batch)} URLs.{Colors.ENDC}")
+    scan_task_id = start_burp_scan(batch, burp_api_url, scan_configuration_ids)
+    if scan_task_id:
+        await monitor_scan_progress(scan_task_id, burp_api_url)
+    else:
+        print(f"{Colors.FAIL}Failed to start scan for the current batch.{Colors.ENDC}")
+
 async def main():
     file_path = 'domains.txt'
     burp_api_url = 'http://localhost:1337'
-    burp_api_key = 'your_api_key_here'
     scan_configuration_ids = ['OptimisedCrawl', 'OptimisedAudit']
 
-    urls = read_domains_from_file(file_path)
-    print(f"{Colors.BOLD}Starting scan for {len(urls)} URLs.{Colors.ENDC}")
+    urls = read_domains_from_file_and_prepare_variants(file_path)
+    batches = segment_into_batches(urls, 2)
 
-    scan_task_id = start_burp_scan(urls, burp_api_url, burp_api_key, scan_configuration_ids)
-    if scan_task_id:
-        monitor_scan_progress(scan_task_id, burp_api_url, burp_api_key)
+    for batch in batches:
+        await process_batch(batch, burp_api_url, scan_configuration_ids)
+        # Optional: Pause between batches if needed
 
 if __name__ == "__main__":
     asyncio.run(main())
