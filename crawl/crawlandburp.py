@@ -60,12 +60,19 @@ def read_domains_from_file_and_prepare_variants(file_path):
         reader = csv.reader(file)
         for row in reader:
             domain = row[0].strip()
+
+            # Prepare variants
+            variants = [domain]
             if not domain.startswith('http://') and not domain.startswith('https://'):
-                http_version = 'http://' + domain
-                https_version = 'https://' + domain
-                domains.extend([http_version, https_version])
-            else:
-                domains.append(domain)
+                variants = [
+                    'http://' + domain,
+                    'https://' + domain,
+                    'https://www.' + domain
+                ]
+            elif domain.startswith('https://'):
+                variants.append(domain.replace('https://', 'https://www.'))
+
+            domains.extend(variants)
     return domains
 
 def start_burp_scan(urls, burp_api_url, scan_configuration_ids=[]):
