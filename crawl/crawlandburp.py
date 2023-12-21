@@ -2,6 +2,7 @@
 # This script is currently developed to not use burp's REST API key.
 # Could have been written much better, yet it is in "ghetto_scripts" for a reason..
 
+#!/usr/bin/python3
 import asyncio
 import requests
 import os
@@ -125,7 +126,7 @@ async def main():
     scan_configuration_ids = ['OptimisedCrawl', 'OptimisedAudit']
 
     urls = read_domains_from_file_and_prepare_variants(file_path)
-    batches = segment_into_batches(urls, 2)
+    batches = segment_into_batches(urls, 250)
 
     for batch in batches:
         await process_batch(batch, burp_api_url, scan_configuration_ids)
@@ -133,4 +134,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
